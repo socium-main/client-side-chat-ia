@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <style>
+        .chat-box {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    
+        .chat-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+    
+        .chat-header-image {
+            max-width: 40%; /* Makes sure the image doesn't exceed the chatbox width */
+            width: auto; /* Maintains the aspect ratio */
+            height: auto; /* Ensures proportional scaling */
+        }
+    
+        .chat-log {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+    
+        .chat-log div {
+            margin-bottom: 5px;
+        }
+    
+        .chat-input {
+            display: flex;
+        }
+    
+        .chat-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 5px;
+        }
+    
+        .chat-input button {
+            padding: 10px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    
+        .chat-input button:hover {
+            background-color: #0056b3;
+        }
+    </style>    
+</head>
+<body>
+    <div class="chat-box">
+        <div class="chat-header">
+            <img src="{{ url_for('static', filename='logo-socium.png') }}" alt="Chat Header Image" class="chat-header-image">
+        </div>
+        <div class="chat-log" id="chat-log"></div>
+        <form id="chat-form">
+            <div class="chat-input">
+                <input type="text" id="chat-input" placeholder="Type your message..." required>
+                <button type="submit">Send</button>
+            </div>
+        </form>
+    </div>    
+
+    <script>
+        const chatLog = document.getElementById('chat-log');
+        const chatInput = document.getElementById('chat-input');
+        const chatForm = document.getElementById('chat-form');
+    
+        function appendMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.innerText = `${sender}: ${message}`;
+            chatLog.appendChild(messageDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+    
+        function calculateDelay(block) {
+            const words = block.split(/\s+/).filter(word => word.trim() !== "").length;
+            return Math.ceil(words / 3) * 1000; // 1 second per 5 words
+        }
+    
+        async function displayBlocks(sender, blocks) {
+            for (let i = 0; i < blocks.length; i++) {
+                appendMessage(sender, blocks[i]);
+    
+                if (i < blocks.length - 1) {
+                    const delay = calculateDelay(blocks[i]);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+    
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+    
+            appendMessage('You', message);
+            chatInput.value = '';
+    
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+    
+                if (response.ok) {
+                    const data = await response.json();
+    
+                    // Split backend message into blocks using <block> tags
+                    const blocks = data.response.split(/<\/?block>/).filter(block => block.trim() !== "");
+    
+                    await displayBlocks('AI', blocks);
+    
+                    // Update the title with the session_id
+                    if (data.session_id) {
+                        document.title = `Session: ${data.session_id}`;
+                    }
+                } else {
+                    appendMessage('System', 'Error: Could not send the message.');
+                }
+            } catch (error) {
+                appendMessage('System', 'Error: Network issue.');
+            }
+        }
+    
+        // Add a listener for the form's submit event
+        chatForm.addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent the form from reloading the page
+            sendMessage();
+        });
+    </script>
+    
+    
+    </body>
+</html>
